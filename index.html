@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Advanced Device Info & Orientation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      background: #f9f9f9;
+      padding: 1rem;
+      max-width: 800px;
+      margin: auto;
+    }
+    pre {
+      background: #222;
+      color: #0f0;
+      padding: 1rem;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello Aka</h1>
+
+  <h2>Your device info:</h2>
+  <pre id="deviceInfo">Loading device info...</pre>
+
+  <h2>Your battery info:</h2>
+  <pre id="batteryInfo">Loading battery info...</pre>
+
+  <h2>Your location:</h2>
+  <pre id="locationInfo">Loading location...</pre>
+
+  <h2>Your device orientation:</h2>
+  <pre id="orientationInfo">Waiting for orientation data...</pre>
+
+  <script>
+    // Basic device info with new details
+    function getBrowserName() {
+      const ua = navigator.userAgent;
+      if (ua.indexOf("Firefox") > -1) return "Firefox";
+      if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1 && ua.indexOf("OPR") === -1) return "Chrome";
+      if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) return "Safari";
+      if (ua.indexOf("Edg") > -1) return "Edge";
+      if (ua.indexOf("OPR") > -1 || ua.indexOf("Opera") > -1) return "Opera";
+      return "Unknown";
+    }
+
+    async function getStorageEstimate() {
+      if (navigator.storage && navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        return `Quota: ${(estimate.quota / (1024**3)).toFixed(2)} GB\nUsage: ${(estimate.usage / (1024**3)).toFixed(2)} GB`;
+      } else {
+        return 'Storage estimate not supported.';
+      }
+    }
+
+    function getGPUInfo() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return 'No WebGL support';
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) + ' / ' + gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+        }
+        return 'WebGL supported but no debug info available';
+      } catch {
+        return 'Error getting GPU info';
+      }
+    }
+
+    (async function() {
+      const deviceInfoLines = [
+        `User Agent: ${navigator.userAgent}`,
+        `Platform: ${navigator.platform}`,
+        `Language: ${navigator.language}`,
+        `Languages accepted: ${navigator.languages.join(', ')}`,
+        `Online: ${navigator.onLine}`,
+        `Screen resolution: ${window.screen.width} x ${window.screen.height}`,
+        `Device pixel ratio: ${window.devicePixelRatio}`,
+        `Screen pixel depth: ${window.screen.pixelDepth}`,
+        `Device memory: ${navigator.deviceMemory || 'N/A'} GB`,
+        `Logical CPU cores: ${navigator.hardwareConcurrency || 'N/A'}`,
+        `Touch support: ${('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 'Yes' : 'No'}`,
+        `Max touch points: ${navigator.maxTouchPoints || 0}`,
+        `Cookies enabled: ${navigator.cookieEnabled}`,
+        `Do Not Track: ${navigator.doNotTrack || 'N/A'}`,
+        `Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+        `Current local time: ${new Date().toLocaleString()}`,
+        `Timezone offset (minutes): ${new Date().getTimezoneOffset()}`,
+        `Browser detected: ${getBrowserName()}`,
+        `Network type: ${navigator.connection?.effectiveType || 'N/A'}`,
+        `Network downlink speed: ${navigator.connection?.downlink || 'N/A'} Mbps`,
+        `Screen orientation: ${screen.orientation?.type || 'N/A'}`,
+        `Screen orientation angle: ${screen.orientation?.angle || 0}°`,
+        `GPU Info: ${getGPUInfo()}`,
+        `Installed plugins: ${navigator.plugins.length > 0 ? Array.from(navigator.plugins).map(p => p.name).join(', ') : 'None'}`,
+        `Supported mime types: ${navigator.mimeTypes.length > 0 ? Array.from(navigator.mimeTypes).map(m => m.type).join(', ') : 'None'}`
+      ];
+
+      document.getElementById('deviceInfo').textContent = deviceInfoLines.join('\n');
+
+      // Battery info
+      if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        function updateBatteryInfo() {
+          document.getElementById('batteryInfo').textContent =
+            `Charging: ${battery.charging}\n` +
+            `Battery level: ${(battery.level * 100).toFixed(0)}%\n` +
+            `Charging time: ${battery.chargingTime === Infinity ? 'N/A' : battery.chargingTime + ' seconds'}\n` +
+            `Discharging time: ${battery.dischargingTime === Infinity ? 'N/A' : battery.dischargingTime + ' seconds'}`;
+        }
+        updateBatteryInfo();
+        battery.addEventListener('chargingchange', updateBatteryInfo);
+        battery.addEventListener('levelchange', updateBatteryInfo);
+        battery.addEventListener('chargingtimechange', updateBatteryInfo);
+        battery.addEventListener('dischargingtimechange', updateBatteryInfo);
+      } else {
+        document.getElementById('batteryInfo').textContent = 'Battery info not supported.';
+      }
+
+      // Geolocation
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const coords = pos.coords;
+            document.getElementById('locationInfo').textContent =
+              `Latitude: ${coords.latitude}\nLongitude: ${coords.longitude}\nAccuracy: ±${coords.accuracy} meters`;
+          },
+          (error) => {
+            document.getElementById('locationInfo').textContent = `Location error: ${error.message}`;
+          }
+        );
+      } else {
+        document.getElementById('locationInfo').textContent = 'Geolocation not supported by this browser.';
+      }
+
+      // Device orientation
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', (event) => {
+          const alpha = event.alpha?.toFixed(2) ?? 'N/A';
+          const beta = event.beta?.toFixed(2) ?? 'N/A';
+          const gamma = event.gamma?.toFixed(2) ?? 'N/A';
+
+          document.getElementById('orientationInfo').textContent =
+            `Alpha (compass): ${alpha}°\nBeta (front-back tilt): ${beta}°\nGamma (left-right tilt): ${gamma}°`;
+        }, true);
+      } else {
+        document.getElementById('orientationInfo').textContent = 'Device orientation not supported by this browser.';
+      }
+    })();
+  </script>
+</body>
+</html>
